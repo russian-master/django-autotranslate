@@ -75,7 +75,7 @@ class GoogleAPITranslatorService(BaseTranslatorService):
         return response.get('translations').pop(0).get('translatedText')
 
     def translate_strings(self, strings, target_language, source_language='en', optimized=True):
-        assert isinstance(strings, collections.MutableSequence), \
+        assert isinstance(strings, collections.abc.MutableSequence), \
             '`strings` should be a sequence containing string_types'
         assert not optimized, 'optimized=True is not supported in `GoogleAPITranslatorService`'
         if len(strings) == 0:
