@@ -128,8 +128,18 @@ class YandexAPITranslatorService(BaseTranslatorService):
         }
 
         response = requests.post(self.api_url, json=body, headers=headers)
-        response_data = response.json()
 
-        # Extract translated texts from the response and return
-        translations = [item['text'] for item in response_data.get('translations', [])]
-        return translations
+        # Check for successful response
+        if response.status_code != 200:
+            raise Exception(f"Error with status code {response.status_code}: {response.text}")
+
+        # Parse the JSON response
+        data = response.json()
+
+        # Check for errors in the returned data (this is a general approach, you'd need to adjust based on the actual structure of Yandex's error responses)
+        if "error" in data:
+            raise Exception(f"Error from Yandex Translate API: {data['error']}")
+
+        # Extract translations from the response
+        translated_texts = [item['text'] for item in data.get('translations', [])]
+        return translated_texts
