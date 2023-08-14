@@ -106,6 +106,11 @@ class Command(BaseCommand):
         po = polib.pofile(os.path.join(root, file_name))
         strings = self.get_strings_to_translate(po)
 
+        if not strings:
+            logger.info('no strings, skipping translation for locale `{}`'.format(target_language))
+            print('no strings, skipping translation for locale `{}`'.format(target_language))
+            return
+
         # Use the chosen translator object for translations
         translated_strings = self.translator.translate_strings(strings, target_language, self.source_language, False)
         
