@@ -56,6 +56,7 @@ class GoogleAPITranslatorService(BaseTranslatorService):
     def __init__(self, max_segments=128):
         assert googleapiclient, '`GoogleAPITranslatorService` requires `google-api-python-client` package'
 
+        self.request_count = 0
         self.developer_key = getattr(settings, 'GOOGLE_TRANSLATE_KEY', None)
         assert self.developer_key, ('`GOOGLE_TRANSLATE_KEY` is not configured, '
                                     'it is required by `GoogleAPITranslatorService`')
@@ -69,10 +70,14 @@ class GoogleAPITranslatorService(BaseTranslatorService):
         self.max_segments = max_segments
         self.translated_strings = []
 
+    def get_request_count(self):
+        return self.request_count
+
     def translate_string(self, text, target_language, source_language='en'):
         assert isinstance(text, six.string_types), '`text` should a string literal'
         response = self.service.translations() \
             .list(source=source_language, target=target_language, q=[text]).execute()
+        
         return response.get('translations').pop(0).get('translatedText')
 
     def translate_strings(self, strings, target_language, source_language='en', optimized=True):
@@ -85,6 +90,7 @@ class GoogleAPITranslatorService(BaseTranslatorService):
             setattr(self, 'translated_strings', getattr(self, 'translated_strings', []))
             response = self.service.translations() \
                 .list(source=source_language, target=target_language, q=strings).execute()
+            self.request_count += 1
             self.translated_strings.extend([t.get('translatedText') for t in response.get('translations')])
             return self.translated_strings
         else:
@@ -107,11 +113,15 @@ class YandexAPITranslatorService(BaseTranslatorService):
         self.api_key = getattr(settings, 'YANDEX_API_KEY', None)
         self.iam_token = getattr(settings, 'YANDEX_IAM_TOKEN', None)
         self.folder_id = getattr(settings, 'YANDEX_FOLDER_ID', None)
+        self.request_count = 0
         
         # Ensure either API key or IAM token is provided, and if IAM token is used, folder_id is also provided
         if not self.api_key and not (self.iam_token and self.folder_id):
             raise ValueError('Either `YANDEX_API_KEY` or both `YANDEX_IAM_TOKEN` and `YANDEX_FOLDER_ID` must be provided for `YandexAPITranslatorService`')
     
+    def get_request_count(self):
+        return self.request_count
+
     def translate_string(self, text, target_language, source_language='en'):
         # Translate a single string
         translated_text = self.translate_strings([text], target_language, source_language)
@@ -140,6 +150,7 @@ class YandexAPITranslatorService(BaseTranslatorService):
             raise ValueError("Neither Yandex API Key nor IAM Token is provided in the settings.")
 
         response = requests.post(self.api_url, json=body, headers=headers)
+        self.request_count += 1
 
         # Check for successful response
         if response.status_code != 200:

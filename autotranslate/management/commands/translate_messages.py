@@ -109,6 +109,10 @@ class Command(BaseCommand):
         # Use the chosen translator object for translations
         translated_strings = self.translator.translate_strings(strings, target_language, self.source_language, False)
         
+        # Report the number of cloud requests made
+        logger.info(f'{self.translator.get_request_count()} cloud requests were made for locale `{target_language}`.')
+        print(f'{self.translator.get_request_count()} cloud requests were made for locale `{target_language}`.')
+
         # translate the strings,
         # all the translated strings are returned
         # in the same order on the same index
