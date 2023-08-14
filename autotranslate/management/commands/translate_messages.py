@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from autotranslate.utils import get_translator
+from autotranslate.services import YandexAPITranslatorService, GoogleAPITranslatorService 
 
 logger = logging.getLogger(__name__)
 
@@ -49,15 +50,27 @@ class Command(BaseCommand):
                             help='set the fuzzy flag on autotranslated messages.')
         parser.add_argument('--source-language', '-s', default='en', dest='source_language', action='store',
                             help='override the default source language (en) used for translation.')
+        parser.add_argument('-cloud', '--cloud', type=str, 
+                            choices=['google', 'yandex'], default='google-or-yandex', help='Cloud provider for translation')
 
     def set_options(self, **options):
         self.locale = options['locale']
         self.skip_translated = options['skip_translated']
         self.set_fuzzy = options['set_fuzzy']
         self.source_language = options['source_language']
+        self.cloud_provider = options['cloud']
 
     def handle(self, *args, **options):
         self.set_options(**options)
+
+        if self.cloud_provider == 'google':
+            self.translator = get_translator('autotranslate.services.GoogleAPITranslatorService')
+        elif self.cloud_provider == 'yandex':
+            self.translator = get_translator('autotranslate.services.YandexAPITranslatorService')
+        else:
+            raise ValueError(f"Unsupported cloud provider: {self.cloud_provider}")
+
+
 
         assert getattr(settings, 'USE_I18N', False), 'i18n framework is disabled'
         assert getattr(settings, 'LOCALE_PATHS', []), 'locale paths is not configured properly'
@@ -93,12 +106,13 @@ class Command(BaseCommand):
         po = polib.pofile(os.path.join(root, file_name))
         strings = self.get_strings_to_translate(po)
 
+        # Use the chosen translator object for translations
+        translated_strings = self.translator.translate_strings(strings, target_language, self.source_language, False)
+        
         # translate the strings,
         # all the translated strings are returned
         # in the same order on the same index
         # viz. [a, b] -> [trans_a, trans_b]
-        tl = get_translator()
-        translated_strings = tl.translate_strings(strings, target_language, self.source_language, False)
         self.update_translations(po, translated_strings)
         po.save()
 

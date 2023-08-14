@@ -1,5 +1,6 @@
 import collections
 import six
+import requests
 
 from autotranslate.compat import goslate, googleapiclient
 
@@ -94,3 +95,41 @@ class GoogleAPITranslatorService(BaseTranslatorService):
             # reset the property or it will grow with subsequent calls
             self.translated_strings = []
             return _translated_strings
+
+
+class YandexAPITranslatorService(BaseTranslatorService):
+    """
+    Uses the Yandex Cloud API for translating.
+    """
+
+    def __init__(self):
+        self.api_url = 'https://translate.api.cloud.yandex.net/translate/v2/translate'
+        self.iam_token = getattr(settings, 'YANDEX_IAM_TOKEN', None)
+        self.folder_id = getattr(settings, 'YANDEX_FOLDER_ID', None)
+        
+        # Check if token and folder_id are configured
+        assert self.iam_token and self.folder_id, ('`YANDEX_IAM_TOKEN` and `YANDEX_FOLDER_ID` are required for `YandexAPITranslatorService`')
+
+    def translate_string(self, text, target_language, source_language='en'):
+        # Translate a single string
+        translated_text = self.translate_strings([text], target_language, source_language)
+        return translated_text[0] if translated_text else text
+
+    def translate_strings(self, strings, target_language, source_language='en', optimized=True):
+        body = {
+            "targetLanguageCode": target_language,
+            "texts": strings,
+            "folderId": self.folder_id,
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer {0}".format(self.iam_token)
+        }
+
+        response = requests.post(self.api_url, json=body, headers=headers)
+        response_data = response.json()
+
+        # Extract translated texts from the response and return
+        translations = [item['text'] for item in response_data.get('translations', [])]
+        return translations
