@@ -104,12 +104,14 @@ class YandexAPITranslatorService(BaseTranslatorService):
 
     def __init__(self):
         self.api_url = 'https://translate.api.cloud.yandex.net/translate/v2/translate'
+        self.api_key = getattr(settings, 'YANDEX_API_KEY', None)
         self.iam_token = getattr(settings, 'YANDEX_IAM_TOKEN', None)
         self.folder_id = getattr(settings, 'YANDEX_FOLDER_ID', None)
         
-        # Check if token and folder_id are configured
-        assert self.iam_token and self.folder_id, ('`YANDEX_IAM_TOKEN` and `YANDEX_FOLDER_ID` are required for `YandexAPITranslatorService`')
-
+        # Ensure either API key or IAM token is provided, and if IAM token is used, folder_id is also provided
+        if not self.api_key and not (self.iam_token and self.folder_id):
+            raise ValueError('Either `YANDEX_API_KEY` or both `YANDEX_IAM_TOKEN` and `YANDEX_FOLDER_ID` must be provided for `YandexAPITranslatorService`')
+    
     def translate_string(self, text, target_language, source_language='en'):
         # Translate a single string
         translated_text = self.translate_strings([text], target_language, source_language)
@@ -122,16 +124,26 @@ class YandexAPITranslatorService(BaseTranslatorService):
             "folderId": self.folder_id,
         }
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer {0}".format(self.iam_token)
-        }
+        if self.api_key:
+            use_auth = 'api-key'
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": "Api-Key {}".format(self.api_key)
+            }
+        elif self.iam_token:
+            use_auth = 'iam'
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer {}".format(self.iam_token)
+            }
+        else:
+            raise ValueError("Neither Yandex API Key nor IAM Token is provided in the settings.")
 
         response = requests.post(self.api_url, json=body, headers=headers)
 
         # Check for successful response
         if response.status_code != 200:
-            raise Exception(f"Error with status code {response.status_code}: {response.text}")
+            raise Exception(f"Error with status code {response.status_code}: {response.text} \nuse_auth: {use_auth}")
 
         # Parse the JSON response
         data = response.json()
